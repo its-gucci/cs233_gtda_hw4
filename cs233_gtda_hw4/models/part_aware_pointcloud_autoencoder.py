@@ -51,9 +51,7 @@ class PartAwarePointcloudAutoencoder(nn.Module):
         y = torch.transpose(y, 1, 2) # shape [batch_size, 131, 1024]
         x = self.decoder(x)
         x = x.view(pointclouds.shape)
-        y = self.part_classifier(y)
-        print(y.size()) # want y to have shape [batch_size, 3, 1024]
-        y = torch.transpose(y, 1, 2) # at the end y has shape [batch_size, 1024, 3] as expected
+        y = self.part_classifier(y) # want y to have shape [batch_size, 4, 1024]
         return x, y
 
     def train_for_one_epoch(self, loader, optimizer, device='cuda'):
@@ -65,20 +63,26 @@ class PartAwarePointcloudAutoencoder(nn.Module):
         """
         self.train()
         loss_meter = AverageMeter()
+        cd_meter = AverageMeter()
+        xe_meter = AverageMeter()
         
         for b in loader:
             batch = b['point_cloud'].to(device)
             gt = b['part_mask'].to(device)
             recon, seg = self.__call__(batch)
             
-            batch_loss = chamfer_loss(batch, recon).mean() + (self.part_lambda * self.xentropy(seg, gt).mean())
+            cd = chamfer_loss(batch, recon).mean()
+            xe = self.xentropy(seg, gt).mean()
+            batch_loss = cd + (self.part_lambda * xe)
             loss_meter.update(batch_loss, len(batch))
+            cd_meter.update(cd, len(batch))
+            xe_meter.update(xe, len(batch))
             
             optimizer.zero_grad()
             batch_loss.backward()
             optimizer.step()
         
-        return loss_meter.avg
+        return loss_meter.avg, cd_meter.avg, xe_meter.avg
 
     @torch.no_grad()
     def reconstruct(self, loader, device='cuda'):
@@ -90,14 +94,17 @@ class PartAwarePointcloudAutoencoder(nn.Module):
         recons = []
         recon_losses = []
         segs = []
+        gts = []
         for b in loader:
             batch = b['point_cloud'].to(device)
             recon, seg = self.__call__(batch)
             recons.append(recon)
             segs.append(seg)
+            gts.append(b['part_mask'].to(device))
             recon_loss = chamfer_loss(batch, recon)
             recon_losses.append(recon_loss)
         recons = torch.cat(recons, dim=0)
         segs = torch.cat(segs, dim=0)
+        gts = torch.cat(gts, dim=0)
         recon_losses = torch.cat(recon_losses, dim=0)
-        return recons, recon_losses, segs
+        return recons, recon_losses, segs, gts
