@@ -32,13 +32,18 @@ class PointcloudAutoencoder(nn.Module):
         :param pointclouds: B x N x 3
         :return: B x latent-dimension of AE
         """
-        raise NotImplementedError
+        return self.encoder(pointclouds).squeeze()
 
     def __call__(self, pointclouds):
         """Forward pass of the AE
             :param pointclouds: B x N x 3
         """
-        raise NotImplementedError
+        x = torch.transpose(pointclouds, 1, 2)
+        x = self.encoder(x)
+        x = torch.transpose(x, 1, 2)
+        x = self.decoder(x)
+        x = x.view(pointclouds.shape)
+        return x
 
     def train_for_one_epoch(self, loader, optimizer, device='cuda'):
         """ Train the autoencoder for one epoch based on the Chamfer loss.
@@ -49,9 +54,13 @@ class PointcloudAutoencoder(nn.Module):
         """
         self.train()
         loss_meter = AverageMeter()
-        # ...
-        # ...
-        raise NotImplementedError
+        
+        for b in loader:
+            batch = b['point_cloud'].to(device)
+            recon = self.__call__(batch)
+            batch_loss = chamfer_loss(batch, recon).mean()
+            loss_meter.update(batch_loss, len(batch))
+        
         return loss_meter.avg
 
     @torch.no_grad()
@@ -61,4 +70,10 @@ class PointcloudAutoencoder(nn.Module):
         :param device: cpu? cuda?
         :return: Left for students to decide
         """
-        raise NotImplementedError
+        recon_losses = []
+        for b in loader:
+            batch = b['point_cloud'].to(device)
+            recon = self.__call__(batch)
+            recon_loss = chamfer_loss(batch, recon).mean()
+            recons.append(recon_loss)
+        return np.mean(recon_losses)

@@ -28,4 +28,13 @@ class MLP(nn.Module):
         :param non_linearity: nn.Module
         """
         super(MLP, self).__init__()
-        raise NotImplementedError
+        modules = []
+        modules.append(nn.Linear(in_feat_dims, out_channels[0]))
+        modules.append(non_linearity)
+        for i in range(1, len(out_channels)):
+            modules.append(nn.Linear(out_channels[i-1], out_channels[i]))
+            modules.append(non_linearity)
+        self.mlp = nn.Sequential(*modules)
+    
+    def forward(self, x):
+        return self.mlp(x)

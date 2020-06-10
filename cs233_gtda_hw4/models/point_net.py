@@ -18,4 +18,16 @@ class PointNet(nn.Module):
         Do not use batch-norm, drop-out and other not requested features.
         Just nn.Linear/Conv1D/ reLUs and the (max) poolings.
         """
-        raise NotImplementedError
+        super(PointNet, self).__init__()
+        modules = []
+        modules.append(nn.Conv1d(in_channels=init_feat_dim, out_channels=conv_dims[0], kernel_size=1))
+        modules.append(nn.ReLU())
+        for i in range(1, len(conv_dims)):
+            modules.append(nn.Conv1d(in_channels=conv_dims[i-1], out_channels=conv_dims[i], kernel_size=1))
+            modules.append(nn.ReLU())
+        modules.append(nn.MaxPool1d(1024))
+        self.pointnet = nn.Sequential(*modules)
+        
+    def forward(self, x):
+        return self.pointnet(x)
+            
