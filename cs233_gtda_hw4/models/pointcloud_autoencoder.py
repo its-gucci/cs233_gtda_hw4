@@ -62,6 +62,7 @@ class PointcloudAutoencoder(nn.Module):
             batch_loss = chamfer_loss(batch, recon).mean()
             loss_meter.update(batch_loss, len(batch))
             
+            optimizer.zero_grad()
             batch_loss.backward()
             optimizer.step()
         
